@@ -22,8 +22,8 @@ Model::Model(std::shared_ptr<Matrix> wi,
   : hidden_(args->dim), output_(wo->m_),
   grad_(args->dim), rng(seed), quant_(false)
 {
-  wi_ = wi;
-  wo_ = wo;
+  wi_ = wi;     // 输入
+  wo_ = wo;     // 输出，词向量矩阵
   args_ = args;
   osz_ = wo->m_;
   hsz_ = args->dim;

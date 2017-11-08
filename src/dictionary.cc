@@ -242,6 +242,7 @@ bool Dictionary::readWord(std::istream& in, std::string& word) const
   return !word.empty();
 }
 
+// train command call it
 void Dictionary::readFromFile(std::istream& in) {
   std::string word;
   int64_t minThreshold = 1;
@@ -271,7 +272,7 @@ void Dictionary::readFromFile(std::istream& in) {
   }
 }
 
-// 1. 将 words_ 数组降序排序
+// 1. 将 words_ 数组按词频降序排序
 // 2. 过滤低频词，@t: min word count; @tl: min label count
 // 3. 重新调整 word2int_ 数组
 void Dictionary::threshold(int64_t t, int64_t tl) {

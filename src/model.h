@@ -45,8 +45,8 @@ class Model {
     Vector hidden_;
     Vector output_;
     Vector grad_;
-    int32_t hsz_;
-    int32_t osz_;
+    int32_t hsz_;   // 等于 args->dim
+    int32_t osz_;   // 等于 nwords
     real loss_;
     int64_t nexamples_;
     real* t_sigmoid;

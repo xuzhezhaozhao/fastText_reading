@@ -35,7 +35,7 @@ struct entry {
 
 class Dictionary {
   private:
-    static const int32_t MAX_VOCAB_SIZE = 30000000;
+    static const int32_t MAX_VOCAB_SIZE = 30000000; // 词空间大小，用于计算 hash
     static const int32_t MAX_LINE_SIZE = 1024;
 
     int32_t find(const std::string&) const;
@@ -48,13 +48,13 @@ class Dictionary {
 
     std::shared_ptr<Args> args_;
     std::vector<int32_t> word2int_;
-    std::vector<entry> words_;
+    std::vector<entry> words_;  // 大小为 MAX_VOCAB_SIZE
 
     std::vector<real> pdiscard_;
-    int32_t size_;
-    int32_t nwords_;
-    int32_t nlabels_;
-    int64_t ntokens_;
+    int32_t size_;      // nwords_ + nlabels_
+    int32_t nwords_;    // no duplicated words
+    int32_t nlabels_;   // no duplicated labels
+    int64_t ntokens_;   // processed tokens
 
     int64_t pruneidx_size_;
     std::unordered_map<int32_t, int32_t> pruneidx_;

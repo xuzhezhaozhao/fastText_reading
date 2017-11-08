@@ -27,6 +27,7 @@ Dictionary::Dictionary(std::shared_ptr<Args> args) : args_(args),
   word2int_(MAX_VOCAB_SIZE, -1), size_(0), nwords_(0), nlabels_(0),
   ntokens_(0), pruneidx_size_(-1) {}
 
+// 对字符串 hash, 返回其 hash 位置，解决冲突的方法为线性探测
 int32_t Dictionary::find(const std::string& w) const {
   return find(w, hash(w));
 }
@@ -34,11 +35,12 @@ int32_t Dictionary::find(const std::string& w) const {
 int32_t Dictionary::find(const std::string& w, uint32_t h) const {
   int32_t id = h % MAX_VOCAB_SIZE;
   while (word2int_[id] != -1 && words_[word2int_[id]].word != w) {
-    id = (id + 1) % MAX_VOCAB_SIZE;
+    id = (id + 1) % MAX_VOCAB_SIZE;     // 线性探测
   }
   return id;
 }
 
+// 此时不计算 subwords
 void Dictionary::add(const std::string& w) {
   int32_t h = find(w);
   ntokens_++;
@@ -78,6 +80,8 @@ const std::vector<int32_t> Dictionary::getSubwords(
   if (i >= 0) {
     return getSubwords(i);
   }
+  // 不在词典中，未知词, 则计算 ngrams, 然后通过其他词的近似 ngram 来获取
+  // 该词的 ngram
   std::vector<int32_t> ngrams;
   computeSubwords(BOW + word + EOW, ngrams);
   return ngrams;
@@ -99,10 +103,11 @@ void Dictionary::getSubwords(const std::string& word,
   computeSubwords(BOW + word + EOW, ngrams, substrings);
 }
 
+// 概率丢弃词，停等词出现频率很高，则大概率被丢弃
 bool Dictionary::discard(int32_t id, real rand) const {
   assert(id >= 0);
   assert(id < nwords_);
-  if (args_->model == model_name::sup) return false;
+  if (args_->model == model_name::sup) return false;    // 非词向量模型不需要丢弃
   return rand > pdiscard_[id];
 }
 
@@ -141,11 +146,32 @@ uint32_t Dictionary::hash(const std::string& str) const {
   return h;
 }
 
+//
+// 假设 ngram 词最短为 3，最长为 3, 词为 where
+// 1. 添加头尾 => <where>
+// 2. substrings 内容为:  
+// <wh
+// <whe
+// <wher
+// <where
+// whe
+// wher
+// where
+// where>
+// her
+// here
+// here>
+// ere
+// ere>
+// re>
+// 3. ngrams 中保存的的 substring 的索引
 void Dictionary::computeSubwords(const std::string& word,
                                std::vector<int32_t>& ngrams,
                                std::vector<std::string>& substrings) const {
   for (size_t i = 0; i < word.size(); i++) {
     std::string ngram;
+
+    // 这里是考虑 utf-8 的汉字情况，来使得能够取出完整的一个汉字作为一个"字"
     if ((word[i] & 0xC0) == 0x80) continue;
     for (size_t j = i, n = 1; j < word.size() && n <= args_->maxn; n++) {
       ngram.push_back(word[j++]);
@@ -190,6 +216,8 @@ void Dictionary::initNgrams() {
   }
 }
 
+// 读取下一个词, 成功读取到一个词返回 true, 否则返回 false
+// 对于换行符的处理有些 trick，效果是遇到换行会新添边界词 EOS
 bool Dictionary::readWord(std::istream& in, std::string& word) const
 {
   char c;
@@ -226,6 +254,7 @@ void Dictionary::readFromFile(std::istream& in) {
       std::cerr << "\rRead " << ntokens_  / 1000000 << "M words" << std::flush;
     }
     if (size_ > 0.75 * MAX_VOCAB_SIZE) {
+        // 词数超过总限制的 75% 就尝试提高阈值，并过滤一些低频词
       minThreshold++;
       threshold(minThreshold, minThreshold);
     }
@@ -245,6 +274,9 @@ void Dictionary::readFromFile(std::istream& in) {
   }
 }
 
+// 1. 将 words_ 数组降序排序
+// 2. 过滤低频词，@t: min word count; @tl: min label count
+// 3. 重新调整 word2int_ 数组
 void Dictionary::threshold(int64_t t, int64_t tl) {
   sort(words_.begin(), words_.end(), [](const entry& e1, const entry& e2) {
       if (e1.type != e2.type) return e1.type < e2.type;
@@ -267,6 +299,11 @@ void Dictionary::threshold(int64_t t, int64_t tl) {
   }
 }
 
+// 计算公式：
+// f = 词频/总token数
+// pdiscard_ = sqrt(t)/f + t/f
+// t 为命令行输入参数
+// 效果是：词频越低越容易被丢弃
 void Dictionary::initTableDiscard() {
   pdiscard_.resize(size_);
   for (size_t i = 0; i < size_; i++) {
@@ -329,7 +366,7 @@ int32_t Dictionary::getLine(std::istream& in,
   while (readWord(in, token)) {
     int32_t h = find(token);
     int32_t wid = word2int_[h];
-    if (wid < 0) continue;
+    if (wid < 0) continue;  // 跳过未知词
 
     ntokens++;
     if (getType(wid) == entry_type::word && !discard(wid, uniform(rng))) {

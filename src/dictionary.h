@@ -30,7 +30,7 @@ struct entry {
   std::string word;
   int64_t count;
   entry_type type;
-  std::vector<int32_t> subwords;
+  std::vector<int32_t> subwords;    // see initNgrams()
 };
 
 class Dictionary {

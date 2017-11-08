@@ -100,7 +100,7 @@ void Dictionary::getSubwords(const std::string& word,
   computeSubwords(BOW + word + EOW, ngrams, substrings);
 }
 
-// 概率丢弃词，停等词出现频率很高，则大概率被丢弃
+// 概率丢弃词
 bool Dictionary::discard(int32_t id, real rand) const {
   assert(id >= 0);
   assert(id < nwords_);
@@ -297,10 +297,10 @@ void Dictionary::threshold(int64_t t, int64_t tl) {
 }
 
 // 计算公式：
-// f = 词频/总token数
-// pdiscard_ = sqrt(t)/f + t/f
+// f = 词频
+// pdiscard_ = sqrt(t/f) + t/f
 // t 为命令行输入参数
-// 效果是：词频越低越容易被丢弃
+// 效果是：词频越大，丢弃概率越大 (可用于丢弃停等词)
 void Dictionary::initTableDiscard() {
   pdiscard_.resize(size_);
   for (size_t i = 0; i < size_; i++) {
@@ -317,6 +317,9 @@ std::vector<int64_t> Dictionary::getCounts(entry_type type) const {
   return counts;
 }
 
+// 用于分类中
+// hashes 保存的一行中每个 token 的 hash 值
+// 添加上下文信息
 void Dictionary::addWordNgrams(std::vector<int32_t>& line,
                                const std::vector<int32_t>& hashes,
                                int32_t n) const {
@@ -329,6 +332,8 @@ void Dictionary::addWordNgrams(std::vector<int32_t>& line,
   }
 }
 
+// 用于分类中
+// 添加 token 的 subwords 信息
 void Dictionary::addSubwords(std::vector<int32_t>& line,
                              const std::string& token,
                              int32_t wid) const {

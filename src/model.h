@@ -49,7 +49,7 @@ class Model {
     int32_t osz_;   // 等于 nwords
     real loss_;
     int64_t nexamples_;
-    real* t_sigmoid;
+    real* t_sigmoid;    // 保存 sigmoid 函数的离散值
     real* t_log;
     // used for negative sampling:
     std::vector<int32_t> negatives;

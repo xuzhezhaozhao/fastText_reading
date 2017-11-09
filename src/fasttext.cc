@@ -653,13 +653,23 @@ void FastText::train(std::shared_ptr<Args> args) {
   if (args_->pretrainedVectors.size() != 0) {
     loadVectors(args_->pretrainedVectors);
   } else {
+    // 初始化输入层, 对于普通 word2vec，输入层就是一个词向量的查找表，
+    // 所以它的大小为 nwords 行，dim 列（dim 为词向量的长度），但是 fastText 用
+    // word n-gram 作为输入，所以输入矩阵的大小为 (nwords + ngram 种类) * dim
+    // 代码中，所有 word n-gram 都被 hash 到固定数目的 bucket 中，所以输入矩阵的
+    // 大小为 (nwords + bucket 个数) * dim
     input_ = std::make_shared<Matrix>(dict_->nwords()+args_->bucket, args_->dim);
     input_->uniform(1.0 / args_->dim);
   }
 
+  // 初始化输出层，输出层无论是用负采样，层次 softmax，还是普通 softmax，
+  // 对于每种可能的输出，都有一个 dim 维的参数向量与之对应
+  // 当 args_->model == model_name::sup 时，训练分类器，
+  // 所以输出的种类是标签总数 dict_->nlabels()
   if (args_->model == model_name::sup) {
     output_ = std::make_shared<Matrix>(dict_->nlabels(), args_->dim);
   } else {
+    // 训练词向量
     output_ = std::make_shared<Matrix>(dict_->nwords(), args_->dim);
   }
   output_->zero();

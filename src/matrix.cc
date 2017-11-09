@@ -65,6 +65,7 @@ void Matrix::uniform(real a) {
   }
 }
 
+// 矩阵第 i 行乘以列向量 vec
 real Matrix::dotRow(const Vector& vec, int64_t i) const {
   assert(i >= 0);
   assert(i < m_);
@@ -76,6 +77,7 @@ real Matrix::dotRow(const Vector& vec, int64_t i) const {
   return d;
 }
 
+// 矩阵第 i 行加上 a * vec
 void Matrix::addRow(const Vector& vec, int64_t i, real a) {
   assert(i >= 0);
   assert(i < m_);

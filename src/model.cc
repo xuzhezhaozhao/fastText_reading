@@ -49,10 +49,14 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
 }
 
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
+  // wo_ 的 target 行点乘 hidden_ 向量
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
+  // 更新向量 grad_ += wo[target] * alpha
   grad_.addRow(*wo_, target, alpha);
+  // 更新 wo_[target] += hidden_ * alpha
   wo_->addRow(hidden_, target, alpha);
+  // 返回损失值
   if (label) {
     return -log(score);
   } else {
@@ -308,6 +312,8 @@ real Model::getLoss() const {
   return loss_ / nexamples_;
 }
 
+// S(t) = 1 / (1 + e^(-t))
+// ref: https://zh.wikipedia.org/wiki/S%E5%87%BD%E6%95%B0
 void Model::initSigmoid() {
   t_sigmoid = new real[SIGMOID_TABLE_SIZE + 1];
   for (int i = 0; i < SIGMOID_TABLE_SIZE + 1; i++) {
@@ -332,6 +338,8 @@ real Model::log(real x) const {
   return t_log[i];
 }
 
+// S(t) = 1 / (1 + e^(-t))
+// ref: https://zh.wikipedia.org/wiki/S%E5%87%BD%E6%95%B0
 real Model::sigmoid(real x) const {
   if (x < -MAX_SIGMOID) {
     return 0.0;

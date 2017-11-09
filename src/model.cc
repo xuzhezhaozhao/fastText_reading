@@ -50,6 +50,8 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
 
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // wo_ 的 target 行点乘 hidden_ 向量
+  // socre = P(Y=1|x) = 1 / (1 + e^(-x))
+  // wo_ 与 hidden_ 的点乘是根据词向量论文中提到的 s() 函数
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
   // 更新向量 grad_ += wo[target] * alpha
@@ -57,9 +59,13 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // 更新 wo_[target] += hidden_ * alpha
   wo_->addRow(hidden_, target, alpha);
   // 返回损失值
+  // 使用标准对数损失函数: -log(P(Y|X))
   if (label) {
+    // 正样本
     return -log(score);
   } else {
+    // 负样本
+    // P(Y=0|x) = 1 - P(Y=1|x) = 1 - score
     return -log(1.0 - score);
   }
 }
@@ -130,9 +136,11 @@ void Model::computeHidden(const std::vector<int32_t>& input, Vector& hidden) con
     if(quant_) {
       hidden.addRow(*qwi_, *it);
     } else {
+      // 将 wi_ 矩阵的第 *it 行加到 hidden_ 上
       hidden.addRow(*wi_, *it);
     }
   }
+  // 求和后除以输入词个数，得到均值向量
   hidden.mul(1.0 / input.size());
 }
 
@@ -213,19 +221,29 @@ void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   assert(target >= 0);
   assert(target < osz_);
   if (input.size() == 0) return;
+  // 计算前向传播：输入层 -> 隐层
+  // hidden_ 向量保存输入词向量的均值
   computeHidden(input, hidden_);
+  // 根据输出层的不同结构，调用不同的函数，在各个函数中，
+  // 不仅通过前向传播算出了 loss_，还进行了反向传播，计算出了 grad_
   if (args_->loss == loss_name::ns) {
+  // 1. 负采样
     loss_ += negativeSampling(target, lr);
   } else if (args_->loss == loss_name::hs) {
+  // 2. 层次 softmax
     loss_ += hierarchicalSoftmax(target, lr);
   } else {
+  // 3. 普通 softmax
     loss_ += softmax(target, lr);
   }
   nexamples_ += 1;
 
+  // 如果是在训练分类器，就将 grad_ 除以 input_ 的大小
+  // 原因不明
   if (args_->model == model_name::sup) {
     grad_.mul(1.0 / input.size());
   }
+  // 反向传播，将 hidden_ 上的梯度传播到 wi_ 上的对应行
   for (auto it = input.cbegin(); it != input.cend(); ++it) {
     wi_->addRow(grad_, *it, 1.0);
   }

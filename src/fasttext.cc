@@ -316,6 +316,10 @@ void FastText::supervised(
     const std::vector<int32_t>& line,
     const std::vector<int32_t>& labels) {
   if (labels.size() == 0 || line.size() == 0) return;
+
+  // 因为一个句子可以打上多个 label，但是 fastText 的架构实际上只有支持一个label
+  // 所以这里随机选择一个 label 来更新模型，这样做会让其它 label 被忽略
+  // 所以 fastText 不太适合做多标签的分类
   std::uniform_int_distribution<> uniform(0, labels.size() - 1);
   int32_t i = uniform(model.rng);
   model.update(line, labels[i], lr);
@@ -325,15 +329,18 @@ void FastText::cbow(Model& model, real lr,
                     const std::vector<int32_t>& line) {
   std::vector<int32_t> bow;
   std::uniform_int_distribution<> uniform(1, args_->ws);
+  // 句子中的每个词都用来更新一次 model
   for (int32_t w = 0; w < line.size(); w++) {
     int32_t boundary = uniform(model.rng);
     bow.clear();
     for (int32_t c = -boundary; c <= boundary; c++) {
       if (c != 0 && w + c >= 0 && w + c < line.size()) {
+        // 上下文词的 n-gram 也被加入到输入中
         const std::vector<int32_t>& ngrams = dict_->getSubwords(line[w + c]);
         bow.insert(bow.end(), ngrams.cbegin(), ngrams.cend());
       }
     }
+    // 用当前词的上下文来预测当前词, model 只进行一次更新
     model.update(bow, line[w], lr);
   }
 }
@@ -342,8 +349,12 @@ void FastText::skipgram(Model& model, real lr,
                         const std::vector<int32_t>& line) {
   std::uniform_int_distribution<> uniform(1, args_->ws);
   for (int32_t w = 0; w < line.size(); w++) {
+    // boundary 服从 [1, ws] 上的均匀分布
     int32_t boundary = uniform(model.rng);
+    // ngrams 数组中包含了词本身和其 n-gram, 利用这些信息来预测这个词的上下文
     const std::vector<int32_t>& ngrams = dict_->getSubwords(line[w]);
+    // 词的上下文长度是随机选择的
+    // 对上下文的每一个词分别更新一次模型
     for (int32_t c = -boundary; c <= boundary; c++) {
       if (c != 0 && w + c >= 0 && w + c < line.size()) {
         model.update(ngrams, line[w + c], lr);
@@ -553,6 +564,9 @@ void FastText::analogies(int32_t k) {
 }
 
 void FastText::trainThread(int32_t threadId) {
+  // 根据线程数，将训练文件按照总字节数（utils::size）均分成多个部分
+  // 这么做的一个后果是，每一部分的第一个词有可能从中间被切断，
+  // 这样的"小噪音"对于整体的训练结果无影响
   std::ifstream ifs(args_->input);
   utils::seek(ifs, threadId * utils::size(ifs) / args_->thread);
 
@@ -567,7 +581,10 @@ void FastText::trainThread(int32_t threadId) {
   int64_t localTokenCount = 0;
   std::vector<int32_t> line, labels;
   while (tokenCount < args_->epoch * ntokens) {
+    // tokenCount 为所有线程处理完毕的 token 总数, 为原子变量
+    // 当处理了 args_->epoch 遍所有 token 后，训练结束 
     real progress = real(tokenCount) / (args_->epoch * ntokens);
+    // 更新学习率, 根据 progress 线性下降
     real lr = args_->lr * (1.0 - progress);
     if (args_->model == model_name::sup) {
       localTokenCount += dict_->getLine(ifs, line, labels, model.rng);
@@ -579,10 +596,15 @@ void FastText::trainThread(int32_t threadId) {
       localTokenCount += dict_->getLine(ifs, line, model.rng);
       skipgram(model, lr, line);
     }
+
+    // args_->lrUpdateRate 是每个线程学习率的变化率，默认为 100，
+    // 它的作用是，每处理一定的行数，再更新全局的 tokenCount 变量，
+    // 从而影响学习率
     if (localTokenCount > args_->lrUpdateRate) {
       tokenCount += localTokenCount;
       localTokenCount = 0;
       if (threadId == 0 && args_->verbose > 1) {
+        // 0 号线程负责输出进度
         printInfo(progress, model.getLoss());
       }
     }
@@ -703,3 +725,5 @@ bool FastText::isQuant() const {
 }
 
 }
+    
+    for (int32_t c = -boundary; c <= boundary; c++) {

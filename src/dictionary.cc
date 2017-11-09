@@ -319,8 +319,9 @@ std::vector<int64_t> Dictionary::getCounts(entry_type type) const {
 }
 
 // 用于分类中
-// hashes 保存的一行中每个 token 的 hash 值
-// 添加上下文信息
+// hashes 保存一行中每个 token 的 hash 值
+// 将一个词的 n-gram 加入词表，用于处理未登录词。
+// （即便一个词不在词表里，我们也可以用它的 word n-gram 来预测一个结果）
 void Dictionary::addWordNgrams(std::vector<int32_t>& line,
                                const std::vector<int32_t>& hashes,
                                int32_t n) const {
@@ -357,6 +358,7 @@ void Dictionary::reset(std::istream& in) const {
   }
 }
 
+// 词向量方法调用这个函数
 int32_t Dictionary::getLine(std::istream& in,
                             std::vector<int32_t>& words,
                             std::minstd_rand& rng) const {
@@ -364,7 +366,7 @@ int32_t Dictionary::getLine(std::istream& in,
   std::string token;
   int32_t ntokens = 0;
 
-  reset(in);
+  reset(in);    // 若读到文件结尾，则重置 eof，重新从头开始读
   words.clear();
   while (readWord(in, token)) {
     int32_t h = find(token);
@@ -380,6 +382,7 @@ int32_t Dictionary::getLine(std::istream& in,
   return ntokens;
 }
 
+// 分类器调用这个函数
 int32_t Dictionary::getLine(std::istream& in,
                             std::vector<int32_t>& words,
                             std::vector<int32_t>& labels,

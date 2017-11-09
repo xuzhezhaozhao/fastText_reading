@@ -35,8 +35,8 @@ class FastText {
   std::shared_ptr<Args> args_;
   std::shared_ptr<Dictionary> dict_;
 
-  std::shared_ptr<Matrix> input_;
-  std::shared_ptr<Matrix> output_;
+  std::shared_ptr<Matrix> input_;   // 初始为 [-1/dim, 1/dim] 的均匀分布
+  std::shared_ptr<Matrix> output_;  // init zero
 
   std::shared_ptr<QMatrix> qinput_;
   std::shared_ptr<QMatrix> qoutput_;

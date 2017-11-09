@@ -22,8 +22,8 @@ Model::Model(std::shared_ptr<Matrix> wi,
   : hidden_(args->dim), output_(wo->m_),
   grad_(args->dim), rng(seed), quant_(false)
 {
-  wi_ = wi;     // 输入
-  wo_ = wo;     // 输出，词向量矩阵
+  wi_ = wi;     // 输入, 初始为 [-1/dim, 1/dim] 的均匀分布
+  wo_ = wo;     // 输出，词向量矩阵, init zero
   args_ = args;
   osz_ = wo->m_;
   hsz_ = args->dim;
@@ -48,17 +48,24 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
   }
 }
 
+// LR 模型中的梯度计算公式为 grad = x*error, 参数 w 更新为 w = w + alpha * grad
+// 代码中 wo_[target] 对应 LR 中的 w 参数, label-score 对应 error， 
+// alpha 对应 alpha * error
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // wo_ 的 target 行点乘 hidden_ 向量
   // socre = P(Y=1|x) = 1 / (1 + e^(-x))
-  // wo_ 与 hidden_ 的点乘是根据词向量论文中提到的 s() 函数
+  // wo_ 与 hidden_ 的点乘是根据词向量论文中提到的 s() 函数, hidden_ 是输入
+  // 词向量的均值，取均值是因为输入词向量包含 subwords 词向量
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
-  // 更新向量 grad_ += wo[target] * alpha
+  // 更新向量 grad_ += wo_[target] * alpha
+  // Loss 对于 hidden_ 的梯度累加到 grad_ 上, 梯度公式是上面提到的 x*error, 
+  // 此时把 wo_[target]看作是 x
   grad_.addRow(*wo_, target, alpha);
   // 更新 wo_[target] += hidden_ * alpha
+  // Loss 对于 LR 参数的梯度累加到 wo_ 的对应行上
   wo_->addRow(hidden_, target, alpha);
-  // 返回损失值
+  // 返回损失值 loss
   // 使用标准对数损失函数: -log(P(Y|X))
   if (label) {
     // 正样本
@@ -94,10 +101,12 @@ real Model::hierarchicalSoftmax(int32_t target, real lr) {
   return loss;
 }
 
+// 计算 output = softmax( wo_ * hidden )
 void Model::computeOutputSoftmax(Vector& hidden, Vector& output) const {
   if (quant_ && args_->qout) {
     output.mul(*qwo_, hidden);
   } else {
+    // output = wo_ * hidden
     output.mul(*wo_, hidden);
   }
   real max = output[0], z = 0.0;
@@ -113,20 +122,31 @@ void Model::computeOutputSoftmax(Vector& hidden, Vector& output) const {
   }
 }
 
+// 计算 output_ = softmax( wo_ * hidden_ )
 void Model::computeOutputSoftmax() {
   computeOutputSoftmax(hidden_, output_);
 }
 
+
+// ref: http://blog.csdn.net/l691899397/article/details/52291909
+// wo_ 相当于权重矩阵, hiden_ 相当于输入, output_ 为 softmax 层的输出
+// softmax 的偏导求解: 1. f(z) - 1 (正确预测的位置)  2. f(z)
 real Model::softmax(int32_t target, real lr) {
   grad_.zero();
   computeOutputSoftmax();
   for (int32_t i = 0; i < osz_; i++) {
     real label = (i == target) ? 1.0 : 0.0;
     real alpha = lr * (label - output_[i]);
+    // grad_ += wo_[i] * alpha
+    // 更新梯度
+    // 对参数 hidden_ 求偏导为 wo_，反向传播到 wi_
     grad_.addRow(*wo_, i, alpha);
+    // wo_[i] += hidden_ * alpha
+    // 反向传播到 wo_, output_ = wo_ * hidden_, 对参数 wo_ 求偏导为 hidden_
+    // 更新 softmax 参数
     wo_->addRow(hidden_, i, alpha);
   }
-  return -log(output_[target]);
+  return -log(output_[target]); // 标准对数损失 -log(P(Y|X))
 }
 
 void Model::computeHidden(const std::vector<int32_t>& input, Vector& hidden) const {
@@ -217,15 +237,18 @@ void Model::dfs(int32_t k, int32_t node, real score,
   dfs(k, tree[node].right, score + log(f), heap, hidden);
 }
 
+// target 是待预测的词
 void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   assert(target >= 0);
   assert(target < osz_);
   if (input.size() == 0) return;
   // 计算前向传播：输入层 -> 隐层
+  // wi_ ==> hidden_, 反向传播时对 hidden_ 求偏导
   // hidden_ 向量保存输入词向量的均值
   computeHidden(input, hidden_);
   // 根据输出层的不同结构，调用不同的函数，在各个函数中，
   // 不仅通过前向传播算出了 loss_，还进行了反向传播，计算出了 grad_
+  // 更新了 wo_, grad_
   if (args_->loss == loss_name::ns) {
   // 1. 负采样
     loss_ += negativeSampling(target, lr);

@@ -37,23 +37,23 @@ struct Node {
 
 class Model {
   private:
-    std::shared_ptr<Matrix> wi_;
-    std::shared_ptr<Matrix> wo_;
+    std::shared_ptr<Matrix> wi_;    // 输入词向量，论文3.1节中的 u 向量
+    std::shared_ptr<Matrix> wo_;    // 输入词向量，论文3.1节中的 v 向量
     std::shared_ptr<QMatrix> qwi_;
     std::shared_ptr<QMatrix> qwo_;
     std::shared_ptr<Args> args_;
-    Vector hidden_;
-    Vector output_;
-    Vector grad_;
+    Vector hidden_; // 维度为 args->dim
+    Vector output_; // 矩阵 wo_ * hidden_, 维度为 wo_->m_, 作为 softmax 输出
+    Vector grad_;   // 梯度向量，用于更新 wi_
     int32_t hsz_;   // 等于 args->dim
     int32_t osz_;   // 等于 nwords
-    real loss_;
-    int64_t nexamples_;
+    real loss_;     // 整个训练过程中的总损失, loss_/nexamples_ 为平均损失
+    int64_t nexamples_; // update times
     real* t_sigmoid;    // 保存 sigmoid 函数的离散值
     real* t_log;
     // used for negative sampling:
     std::vector<int32_t> negatives;
-    size_t negpos;
+    size_t negpos;  // 用于实现获取负样本算法
     // used for hierarchical softmax:
     std::vector< std::vector<int32_t> > paths;
     std::vector< std::vector<bool> > codes;
@@ -108,3 +108,4 @@ class Model {
 }
 
 #endif
+    int32_t hsz_;   // 等于 args->dim

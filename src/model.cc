@@ -55,7 +55,7 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // wo_ 的 target 行点乘 hidden_ 向量
   // socre = P(Y=1|x) = 1 / (1 + e^(-x))
   // wo_ 与 hidden_ 的点乘是根据词向量论文中提到的 s() 函数, hidden_ 是输入
-  // 词向量的均值，取均值是因为输入词向量包含 subwords 词向量
+  // 词向量的均值
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
   // 更新向量 grad_ += wo_[target] * alpha

@@ -725,5 +725,3 @@ bool FastText::isQuant() const {
 }
 
 }
-    
-    for (int32_t c = -boundary; c <= boundary; c++) {

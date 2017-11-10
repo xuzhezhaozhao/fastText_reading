@@ -109,4 +109,3 @@ class Model {
 }
 
 #endif
-    int32_t hsz_;   // 等于 args->dim

@@ -55,9 +55,10 @@ class Model {
     std::vector<int32_t> negatives;
     size_t negpos;  // 用于实现获取负样本算法
     // used for hierarchical softmax:
+    // hoffmann code
     std::vector< std::vector<int32_t> > paths;
     std::vector< std::vector<bool> > codes;
-    std::vector<Node> tree;
+    std::vector<Node> tree; // 大小为 2 * osz_ - 1
 
     static bool comparePairs(const std::pair<real, int32_t>&,
                              const std::pair<real, int32_t>&);

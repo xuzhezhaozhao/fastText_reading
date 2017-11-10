@@ -77,6 +77,7 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   }
 }
 
+// 负采样方法
 real Model::negativeSampling(int32_t target, real lr) {
   real loss = 0.0;
   grad_.zero();
@@ -90,6 +91,7 @@ real Model::negativeSampling(int32_t target, real lr) {
   return loss;
 }
 
+// 层次 softmax
 real Model::hierarchicalSoftmax(int32_t target, real lr) {
   real loss = 0.0;
   grad_.zero();
@@ -149,6 +151,7 @@ real Model::softmax(int32_t target, real lr) {
   return -log(output_[target]); // 标准对数损失 -log(P(Y|X))
 }
 
+// 计算隐藏层 hidden_ 向量, 对输入取平均
 void Model::computeHidden(const std::vector<int32_t>& input, Vector& hidden) const {
   assert(hidden.size() == hsz_);
   hidden.zero();
@@ -272,6 +275,7 @@ void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   }
 }
 
+// counts 为词出现词数，按降序排序
 void Model::setTargetCounts(const std::vector<int64_t>& counts) {
   assert(counts.size() == osz_);
   if (args_->loss == loss_name::ns) {
@@ -282,6 +286,7 @@ void Model::setTargetCounts(const std::vector<int64_t>& counts) {
   }
 }
 
+// 初始化负采样点
 void Model::initTableNegatives(const std::vector<int64_t>& counts) {
   real z = 0.0;
   for (size_t i = 0; i < counts.size(); i++) {
@@ -296,6 +301,7 @@ void Model::initTableNegatives(const std::vector<int64_t>& counts) {
   std::shuffle(negatives.begin(), negatives.end(), rng);
 }
 
+// 获得负采样例
 int32_t Model::getNegative(int32_t target) {
   int32_t negative;
   do {
@@ -305,7 +311,15 @@ int32_t Model::getNegative(int32_t target) {
   return negative;
 }
 
+// counts 数组保存每个叶子节点的词频，降序排列
+// 算法首先对输入的叶子节点进行一次排序, 时间复杂度 O(nlogn)，
+// 然后确定两个下标 leaf 和 node，leaf 总是指向当前最小的叶子节点，
+// node 总是指向当前最小的非叶子节点，
+// 所以，最小的两个节点可以从 leaf, leaf - 1, node, node + 1 四个位置中取得，
+// 时间复杂度 O(1)，每个非叶子节点都进行一次，所以总复杂度为 O(n)，
+// 算法整体复杂度为 O(nlogn)
 void Model::buildTree(const std::vector<int64_t>& counts) {
+  // 分配所有节点的空间, osz 个叶子节点, osz-1 个非叶子节点
   tree.resize(2 * osz_ - 1);
   for (int32_t i = 0; i < 2 * osz_ - 1; i++) {
     tree[i].parent = -1;
@@ -317,10 +331,14 @@ void Model::buildTree(const std::vector<int64_t>& counts) {
   for (int32_t i = 0; i < osz_; i++) {
     tree[i].count = counts[i];
   }
+  // leaf 指向当前未处理的叶子节点的最后一个，也就是权值最小的叶子节点
   int32_t leaf = osz_ - 1;
+  // node 指向当前未处理的非叶子节点的第一个，也是权值最小的非叶子节点
   int32_t node = osz_;
+  // 逐个构造所有非叶子节点（i >= osz_, i < 2 * osz - 1)
   for (int32_t i = osz_; i < 2 * osz_ - 1; i++) {
-    int32_t mini[2];
+    int32_t mini[2];    // 最小的两个节点的下标
+    // 计算权值最小的两个节点，候选只可能是 leaf, leaf - 1, node, node + 1
     for (int32_t j = 0; j < 2; j++) {
       if (leaf >= 0 && tree[leaf].count < tree[node].count) {
         mini[j] = leaf--;
@@ -328,6 +346,7 @@ void Model::buildTree(const std::vector<int64_t>& counts) {
         mini[j] = node++;
       }
     }
+    // 更新非叶子节点的属性
     tree[i].left = mini[0];
     tree[i].right = mini[1];
     tree[i].count = tree[mini[0]].count + tree[mini[1]].count;
@@ -335,8 +354,10 @@ void Model::buildTree(const std::vector<int64_t>& counts) {
     tree[mini[1]].parent = i;
     tree[mini[1]].binary = true;
   }
+
+  // 计算霍夫曼编码
   for (int32_t i = 0; i < osz_; i++) {
-    std::vector<int32_t> path;
+    std::vector<int32_t> path;  // 实现时是 tree[j].parent - osz_
     std::vector<bool> code;
     int32_t j = i;
     while (tree[j].parent != -1) {

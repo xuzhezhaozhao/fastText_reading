@@ -495,6 +495,7 @@ void FastText::precomputeWordVectors(Matrix& wordVectors) {
   std::cerr << " done." << std::endl;
 }
 
+// 计算余弦值
 void FastText::findNN(const Matrix& wordVectors, const Vector& queryVec,
                       int32_t k, const std::set<std::string>& banSet) {
   real queryNorm = queryVec.norm();
@@ -582,7 +583,7 @@ void FastText::trainThread(int32_t threadId) {
   std::vector<int32_t> line, labels;
   while (tokenCount < args_->epoch * ntokens) {
     // tokenCount 为所有线程处理完毕的 token 总数, 为原子变量
-    // 当处理了 args_->epoch 遍所有 token 后，训练结束 
+    // 当处理了 args_->epoch 遍所有 token 后，训练结束
     real progress = real(tokenCount) / (args_->epoch * ntokens);
     // 更新学习率, 根据 progress 线性下降
     real lr = args_->lr * (1.0 - progress);

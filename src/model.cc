@@ -49,7 +49,7 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
 }
 
 // LR 模型中的梯度计算公式为 grad = x*error, 参数 w 更新为 w = w + alpha * grad
-// 代码中 wo_[target] 对应 LR 中的 w 参数, label-score 对应 error， 
+// 代码中 wo_[target] 对应 LR 中的 w 参数, label-score 对应 error，
 // alpha 对应 alpha * error
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // wo_ 的 target 行点乘 hidden_ 向量
@@ -59,7 +59,7 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
   // 更新向量 grad_ += wo_[target] * alpha
-  // Loss 对于 hidden_ 的梯度累加到 grad_ 上, 梯度公式是上面提到的 x*error, 
+  // Loss 对于 hidden_ 的梯度累加到 grad_ 上, 梯度公式是上面提到的 x*error,
   // 此时把 wo_[target]看作是 x
   grad_.addRow(*wo_, target, alpha);
   // 更新 wo_[target] += hidden_ * alpha
@@ -184,8 +184,10 @@ void Model::predict(const std::vector<int32_t>& input, int32_t k,
   heap.reserve(k + 1);
   computeHidden(input, hidden);
   if (args_->loss == loss_name::hs) {
+    // 如果是层次 softmax，使用 dfs 遍历霍夫曼树的所有叶子节点，找到 top－k 的概率
     dfs(k, 2 * osz_ - 2, 0.0, heap, hidden);
   } else {
+    // 如果是普通 softmax，在结果数组里找到 top-k
     findKBest(k, heap, hidden, output);
   }
   std::sort_heap(heap.begin(), heap.end(), comparePairs);

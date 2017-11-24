@@ -569,7 +569,7 @@ void FastText::trainThread(int32_t threadId) {
   // 这么做的一个后果是，每一部分的第一个词有可能从中间被切断，
   // 这样的"小噪音"对于整体的训练结果无影响
   std::ifstream ifs(args_->input);
-  utils::seek(ifs, threadId * utils::size(ifs) / args_->thread);
+  utils::seek(ifs, threadId * (utils::size(ifs) / args_->thread));
 
   Model model(input_, output_, args_, threadId);
   if (args_->model == model_name::sup) {

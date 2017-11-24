@@ -61,10 +61,18 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // 更新向量 grad_ += wo_[target] * alpha
   // Loss 对于 hidden_ 的梯度累加到 grad_ 上, 梯度公式是上面提到的 x*error,
   // 此时把 wo_[target]看作是 x
+   
+  // update input
+  // back prop
   grad_.addRow(*wo_, target, alpha);
+
   // 更新 wo_[target] += hidden_ * alpha
   // Loss 对于 LR 参数的梯度累加到 wo_ 的对应行上
+   
+  // LR lambda
+  // fit LR
   wo_->addRow(hidden_, target, alpha);
+
   // 返回损失值 loss
   // 使用标准对数损失函数: -log(P(Y|X))
   if (label) {

@@ -146,7 +146,7 @@ uint32_t Dictionary::hash(const std::string& str) const {
 //
 // 假设 ngram 词最短为 3，最长为 3, 词为 where
 // 1. 添加头尾 => <where>
-// 2. substrings 内容为:  
+// 2. substrings 内容为:
 // <wh
 // <whe
 // <wher
@@ -272,7 +272,7 @@ void Dictionary::readFromFile(std::istream& in) {
   }
 }
 
-// 1. 将 words_ 数组按词频降序排序
+// 1. 将 words_ 数组按词频降序排序, 负采样算法需要这样做
 // 2. 过滤低频词，@t: min word count; @tl: min label count
 // 3. 重新调整 word2int_ 数组
 void Dictionary::threshold(int64_t t, int64_t tl) {
@@ -300,6 +300,7 @@ void Dictionary::threshold(int64_t t, int64_t tl) {
 // 计算公式：
 // f = 词频
 // pdiscard_ = sqrt(t/f) + t/f
+// rand > pdiscard_[i] 则丢弃, t 越大越不容易丢弃
 // t 为命令行输入参数
 // 效果是：词频越大，丢弃概率越大 (可用于丢弃停等词)
 void Dictionary::initTableDiscard() {
